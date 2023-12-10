@@ -1,0 +1,131 @@
+-- 1. Рассчитайте кол-во транзакций по дням.
+SELECT
+	STRFTIME('%Y',date(transaction_date)) AS date_year,
+	STRFTIME('%m',date(transaction_date)) AS date_month,
+	STRFTIME('%d',date(transaction_date)) AS date_day,
+	count(transaction_id)
+FROM sales_reciepts sr
+GROUP BY 1,2,3
+
+-- 2. Рассчитать сумму заказов (line_item_amount) в каждом городе (store_city) и магазине. 
+-- В запросе выведите город, адрес магазина и сумму заказов. Сумму округлите с помощью функции ROUND().
+-- Отсортировать результат в порядке убывания сумм заказов.
+SELECT
+	store_city,
+	store_address,
+	round(sum(line_item_amount)) AS sale_amount
+FROM
+	(SELECT *
+	FROM sales_reciepts sr 
+	LEFT JOIN sales_outlet so 
+	ON sr.sales_outlet_id = so.sales_outlet_id)
+GROUP BY 1,2
+ORDER BY sale_amount 
+
+-- 3. Выведите только те названия регионов (neighborhood), где продавался продукт “Columbian Medium Roast” с последней датой продажи в регионе.
+WITH srso AS(
+	SELECT *
+	FROM sales_reciepts sr 
+	LEFT JOIN sales_outlet so
+	ON sr.sales_outlet_id = so.sales_outlet_id)
+SELECT
+	neighborhood,
+	max(transaction_date) AS last_transaction
+FROM srso
+RIGHT JOIN product p  
+	ON srso.product_id = p.product_id
+WHERE product_name = 'Columbian Medium Roast'
+GROUP BY 1
+
+-- 4. Вывести электронные адреса клиентов и определить их домены с помощью функций работы со строками.
+SELECT
+	email,
+	SUBSTR(email,INSTR(email,'@')+1) AS email_domain
+	FROM customer c 
+	
+-- 5. Разделить имя клиентов на имя и фамилию, отредактировать номер карты лояльности, убрав пробелы.
+-- Вывести количество транзакций (transaction_id) для каждого клиента, отсортировать по убыванию.
+WITH src AS(
+	SELECT *
+	FROM customer c 
+	LEFT JOIN sales_reciepts sr
+	ON c.customer_id = sr.customer_id)
+SELECT	
+	customer_name,
+	SUBSTR(customer_name,1,INSTR(customer_name,' ')-1) AS first_name,
+	SUBSTR(customer_name,INSTR(customer_name,' ')+1) AS last_name,
+	loyalty_card_number,
+	REPLACE(loyalty_card_number,'-','') AS loyalty_card_number_new_format,
+	count(transaction_id) AS transactions_qty
+FROM src
+GROUP BY 1,2,3,4
+ORDER BY transactions_qty desc
+
+-- 6. Собрать витрину данных из нужных таблиц с выводом атрибутов как на картинке ниже.
+-- Для поля gender изменить значения по условию:
+-- Если gender = ‘M’, заменить на ‘Male’,
+-- Если gender = ‘F’, заменить на ‘Female’,
+-- В других случаях проставить ‘Not Defined’
+CREATE VIEW srsopc AS
+SELECT
+	sr.transaction_date,
+	so.sales_outlet_id,
+	so.store_address,
+	p.product_id,
+	p.product_name,
+	c.customer_id,
+	c.customer_name,
+	CASE c.gender
+		WHEN 'M'
+			THEN 'Male'
+		WHEN 'F'
+			THEN 'Female'
+		ELSE 'Not Defined'
+	END gender,
+	sr.unit_price,
+	sr.quantity,
+	sr.line_item_amount
+FROM sales_reciepts sr 
+LEFT JOIN sales_outlet so 
+ON sr.sales_outlet_id = so.sales_outlet_id
+LEFT JOIN product p 
+ON sr.product_id = p.product_id
+LEFT JOIN customer c 
+ON sr.customer_id = c.customer_id
+
+SELECT *
+FROM srsopc s 
+
+-- 7. Опираясь на модель данных ниже, напишите SQL запросы на создание таблиц по модели данных.
+CREATE TABLE Region (
+region_id int PRIMARY KEY,
+region_name varchar,
+region_description varchar,
+stores_opened varchar
+)
+
+CREATE TABLE Store (
+store_id int PRIMARY KEY,
+region_id int REFERENCES Region(region_id),
+store_name varchar,
+store_address varchar,
+work_hours varchar
+)
+
+CREATE TABLE Product (
+product_id int PRIMARY KEY,
+product_name varchar,
+product_description varchar,
+product_category varchar,
+product_subcategory varchar,
+product_price numeric
+)
+
+CREATE TABLE Sales (
+sale_id int PRIMARY KEY,
+product_id int REFERENCES Product(product_id),
+store_id int REFERENCES Store(store_id),
+sale_date date,
+sale_qty int,
+sale_amount numeric
+)
