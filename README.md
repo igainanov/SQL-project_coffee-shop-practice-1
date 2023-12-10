@@ -1,1 +1,1 @@
-SQL project_coffee shop practrice #1
+SQL project_coffee shop practice #1
